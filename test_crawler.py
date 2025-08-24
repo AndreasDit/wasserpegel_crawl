@@ -50,3 +50,7 @@ def test_crawl_neu_ulm_master_data(neu_ulm_station):
     assert 'Datenfernübertragung' in station_df.columns
     assert 'Meldestufen' in station_df.columns
     assert 'Meldebeginn' in station_df.columns
+    assert 'Map_X' in station_df.columns
+    assert 'Map_Y' in station_df.columns
+    assert pd.notna(station_df['Map_X']).all()
+    assert pd.notna(station_df['Map_Y']).all()

@@ -3,6 +3,7 @@ from bs4 import BeautifulSoup
 import pandas as pd
 import urllib.parse
 import argparse
+import re
 
 def _fetch_and_parse_url(url):
     """
@@ -155,6 +156,16 @@ def crawl_station_master_data(station_main_page_url, station_name):
                 key = cols[0].get_text(strip=True)
                 if key: # Only add if key is not empty
                     master_data[key] = "" # Add as a section header with empty value
+
+    # Extract coordinates from JavaScript
+    script_tags = soup.find_all('script')
+    for script in script_tags:
+        if script.string:
+            match = re.search(r'var center = new OpenLayers.LonLat\((\d+\.\d+),(\d+\.\d+)\);', script.string)
+            if match:
+                master_data['Map_X'] = float(match.group(1))
+                master_data['Map_Y'] = float(match.group(2))
+                break
 
     df = pd.DataFrame([master_data]) # Create DataFrame from a list of dictionaries
     return df
