@@ -4,77 +4,81 @@ import pandas as pd
 import urllib.parse
 import argparse
 
+def _fetch_and_parse_url(url):
+    """
+    Fetches the content of a URL and returns a BeautifulSoup object.
+    """
+    try:
+        response = requests.get(url)
+        response.raise_for_status()
+        return BeautifulSoup(response.content, 'html.parser')
+    except requests.exceptions.RequestException as e:
+        print(f"Error fetching URL {url}: {e}")
+        return None
+
+def _find_link_by_text(soup, text_to_find, base_url):
+    """
+    Finds a link in a BeautifulSoup object by its text and returns its absolute URL.
+    """
+    for link_tag in soup.find_all('a', href=True):
+        if text_to_find in link_tag.get_text(strip=True):
+            return urllib.parse.urljoin(base_url, link_tag['href'])
+    return None
+
 def get_station_data():
     base_url = "https://www.hnd.bayern.de"
     list_page_url = f"{base_url}/pegel/meldestufen//tabellen"
-    try:
-        response = requests.get(list_page_url)
-        response.raise_for_status()
-
-        soup = BeautifulSoup(response.content, 'html.parser')
-        table = soup.find('table')
-
-        if not table:
-            print("Could not find the station list table on the page.")
-            return []
-
-        stations = []
-        for row in table.find_all('tr'):
-            first_cell = row.find('td')
-            if first_cell:
-                link_tag = first_cell.find('a', href=True)
-                if link_tag:
-                    station_name = link_tag.get_text(strip=True)
-                    primary_link_href = link_tag['href']
-                    station_main_page_url = urllib.parse.urljoin(base_url, primary_link_href)
-                    
-                    stations.append({'name': station_name, 'link': station_main_page_url})
-
-        return stations
-
-    except requests.exceptions.RequestException as e:
-        print(f"An error occurred while fetching the station list: {e}")
+    
+    soup = _fetch_and_parse_url(list_page_url)
+    if soup is None:
+        print(f"Error: Could not fetch station list page {list_page_url}.")
         return []
+
+    table = soup.find('table')
+
+    if not table:
+        print("Could not find the station list table on the page.")
+        return []
+
+    stations = []
+    for row in table.find_all('tr'):
+        first_cell = row.find('td')
+        if first_cell:
+            link_tag = first_cell.find('a', href=True)
+            if link_tag:
+                station_name = link_tag.get_text(strip=True)
+                primary_link_href = link_tag['href']
+                station_main_page_url = urllib.parse.urljoin(base_url, primary_link_href)
+                
+                stations.append({'name': station_name, 'link': station_main_page_url})
+
+    return stations
 
 def crawl_station_data(station_main_page_url, station_name):
     """
     Crawls water level data from a specific station's main page by finding the 'Tabelle' link
     and then extracting data from that table page.
     """
-    try:
-        # Fetch the station's main page
-        response = requests.get(station_main_page_url)
-        response.raise_for_status()
-    except requests.exceptions.RequestException as e:
-        print(f"Error fetching the station main page {station_main_page_url}: {e}")
+    soup = _fetch_and_parse_url(station_main_page_url)
+    if soup is None:
+        print(f"Error: Could not fetch main page for {station_name} at {station_main_page_url}.")
         return None
-
-    soup = BeautifulSoup(response.content, 'html.parser')
 
     # NEW: Check if 'Wasserstand' is present on the main page
     if "Wasserstand" not in soup.text:
         print(f"Skipping station {station_name} as 'Wasserstand' measurements are not found on its main page {station_main_page_url}.")
         return None
     
-    # Find the 'Tabelle' link within the 'Ansicht' menu
-    tabelle_link = None
-    for link_tag in soup.find_all('a', string='Tabelle', href=True):
-        tabelle_link = urllib.parse.urljoin(station_main_page_url, link_tag['href'])
-        break # Take the first one found
+    tabelle_link = _find_link_by_text(soup, 'Tabelle', station_main_page_url)
 
     if not tabelle_link:
         print(f"Could not find 'Tabelle' link on the main page for station {station_name} at {station_main_page_url}.")
         return None
 
-    # Now, fetch the 'Tabelle' page
-    try:
-        response = requests.get(tabelle_link)
-        response.raise_for_status()
-    except requests.exceptions.RequestException as e:
-        print(f"Error fetching the 'Tabelle' page {tabelle_link}: {e}")
+    soup = _fetch_and_parse_url(tabelle_link)
+    if soup is None:
+        print(f"Error: Could not fetch table page for {station_name} at {tabelle_link}.")
         return None
-
-    soup = BeautifulSoup(response.content, 'html.parser')
     
     # The rest of the function is the existing logic to parse the data table
     table = None
@@ -119,35 +123,21 @@ def crawl_station_master_data(station_main_page_url, station_name):
     Crawls master data from a specific station's main page by finding the 'Stammdaten / Lagekarte / Bild' link
     and then extracting data from that page.
     """
-    try:
-        response = requests.get(station_main_page_url)
-        response.raise_for_status()
-    except requests.exceptions.RequestException as e:
-        print(f"Error fetching the station main page {station_main_page_url}: {e}")
+    soup = _fetch_and_parse_url(station_main_page_url)
+    if soup is None:
+        print(f"Error: Could not fetch main page for {station_name} at {station_main_page_url}.")
         return None
 
-    soup = BeautifulSoup(response.content, 'html.parser')
-
-    # Find the 'Stammdaten / Lagekarte / Bild' link
-    master_data_link = None
-    for link_tag in soup.find_all('a', href=True):
-        if "Stammdaten / Lagekarte / Bild" in link_tag.get_text(strip=True):
-            master_data_link = urllib.parse.urljoin(station_main_page_url, link_tag['href'])
-            break
+    master_data_link = _find_link_by_text(soup, "Stammdaten / Lagekarte / Bild", station_main_page_url)
 
     if not master_data_link:
         print(f"Could not find 'Stammdaten / Lagekarte / Bild' link on the main page for station {station_name} at {station_main_page_url}.")
         return None
 
-    # Now, fetch the master data page
-    try:
-        response = requests.get(master_data_link)
-        response.raise_for_status()
-    except requests.exceptions.RequestException as e:
-        print(f"Error fetching the master data page {master_data_link}: {e}")
+    soup = _fetch_and_parse_url(master_data_link)
+    if soup is None:
+        print(f"Error: Could not fetch master data page for {station_name} at {master_data_link}.")
         return None
-
-    soup = BeautifulSoup(response.content, 'html.parser')
 
     # Placeholder for extracting master data
     master_data = {'Station': station_name}
