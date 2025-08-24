@@ -1,9 +1,18 @@
 import pytest
 import pandas as pd
+import os
 from crawler import get_station_data, crawl_station_data, crawl_station_master_data
 
 # Define the test station
 TEST_STATION_NAME = "Neu-Ulm"
+
+# Define output directory for test CSVs
+TEST_OUTPUT_DIR = "data/test"
+
+@pytest.fixture(scope="module", autouse=True)
+def setup_test_output_dir():
+    """Fixture to create the test output directory before tests run."""
+    os.makedirs(TEST_OUTPUT_DIR, exist_ok=True)
 
 @pytest.fixture(scope="module")
 def neu_ulm_station():
@@ -28,6 +37,7 @@ def test_crawl_neu_ulm_measurements(neu_ulm_station):
     assert 'Forecast_Upper' in station_df.columns
     assert (station_df['Station'] == TEST_STATION_NAME).all()
     assert 'measured' in station_df['Type'].unique()
+    station_df.to_csv(os.path.join(TEST_OUTPUT_DIR, 'neu_ulm_measurements_test.csv'), index=False)
 
 def test_crawl_neu_ulm_master_data(neu_ulm_station):
     """Test crawling master data for Neu-Ulm station."""
@@ -54,3 +64,4 @@ def test_crawl_neu_ulm_master_data(neu_ulm_station):
     assert 'Map_Y' in station_df.columns
     assert pd.notna(station_df['Map_X']).all()
     assert pd.notna(station_df['Map_Y']).all()
+    station_df.to_csv(os.path.join(TEST_OUTPUT_DIR, 'neu_ulm_master_data_test.csv'), index=False)

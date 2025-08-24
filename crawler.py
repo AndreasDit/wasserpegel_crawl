@@ -205,9 +205,9 @@ if __name__ == '__main__':
             print(f"Collected data from {len(all_data)} stations. Concatenating...")
             combined_df = pd.concat(all_data, ignore_index=True)
             
-            output_filename = 'water_levels.csv'
+            output_filename = 'data/water_levels.csv'
             if CRAWL_MODE == "master_data":
-                output_filename = 'station_master_data.csv'
+                output_filename = 'data/station_master_data.csv'
 
             combined_df.to_csv(output_filename, index=False)
             print(f"Successfully crawled and saved data to {output_filename}")
