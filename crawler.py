@@ -29,33 +29,57 @@ def _find_link_by_text(soup, text_to_find, base_url):
 def get_station_data():
     base_url = "https://www.hnd.bayern.de"
     list_page_url = f"{base_url}/pegel/meldestufen//tabellen"
-    
+
     soup = _fetch_and_parse_url(list_page_url)
     if soup is None:
         print(f"Error: Could not fetch station list page {list_page_url}.")
-        return []
+        return [], {} # Return empty list and dict on error
 
     table = soup.find('table')
 
     if not table:
         print("Could not find the station list table on the page.")
-        return []
+        return [], {} # Return empty list and dict on error
 
     stations = []
-    for row in table.find_all('tr'):
-        first_cell = row.find('td')
-        if first_cell:
-            link_tag = first_cell.find('a', href=True)
+    meldestufen = {} # Dictionary to store meldestufen
+
+    # Find the header row
+    header_row = table.find('tr')
+    if not header_row:
+        print("Could not find header row in the table.")
+        return [], {}
+
+    # Extract headers from both th and td tags in the first row
+    headers = [cell.get_text(strip=True) for cell in header_row.find_all(['th', 'td'])]
+    meldestufe_col_idx = -1
+    try:
+        meldestufe_col_idx = headers.index('Melde\xadstufe') # Corrected header
+    except ValueError:
+        print("Warning: 'Meldestufe' column not found in the table headers.")
+        # Continue without meldestufe if not found
+
+    for row in table.find_all('tr')[1:]: # Skip header row
+        cols = row.find_all('td')
+        if cols:
+            link_tag = cols[0].find('a', href=True)
             if link_tag:
                 station_name = link_tag.get_text(strip=True)
                 primary_link_href = link_tag['href']
                 station_main_page_url = urllib.parse.urljoin(base_url, primary_link_href)
-                
+
                 stations.append({'name': station_name, 'link': station_main_page_url})
 
-    return stations
+                # Extract Meldestufe if column exists
+                if meldestufe_col_idx != -1 and len(cols) > meldestufe_col_idx:
+                    meldestufe_value = cols[meldestufe_col_idx].get_text(strip=True)
+                    meldestufen[station_name] = meldestufe_value
+                else:
+                    meldestufen[station_name] = "N/A" # Assign N/A if not found
 
-def crawl_station_data(station_main_page_url, station_name):
+    return stations, meldestufen
+
+def crawl_station_data(station_main_page_url, station_name, meldestufen_data):
     """
     Crawls water level data from a specific station's main page by finding the 'Tabelle' link
     and then extracting data from that table page.
@@ -99,24 +123,25 @@ def crawl_station_data(station_main_page_url, station_name):
             date_time_str = cols[0].text.strip()
             water_level_str = cols[1].text.strip()
 
+            current_meldestufe = meldestufen_data.get(station_name, "N/A")
             if '-' in water_level_str:
                 value_type = 'forecast'
                 parts = water_level_str.split('-', 1) 
                 if len(parts) == 2:
                     lower, upper = parts
-                    data.append([station_name, date_time_str, value_type, '', lower.strip(), upper.strip()])
+                    data.append([station_name, date_time_str, value_type, '', lower.strip(), upper.strip(), current_meldestufe])
                 else:
                     print(f"Warning: Unexpected forecast format for {station_name}: {water_level_str}")
-                    data.append([station_name, date_time_str, value_type, '', '', ''])
+                    data.append([station_name, date_time_str, value_type, '', '', '', current_meldestufe])
             else:
                 value_type = 'measured'
-                data.append([station_name, date_time_str, value_type, water_level_str, '', ''])
+                data.append([station_name, date_time_str, value_type, water_level_str, '', '', current_meldestufe])
 
     if not data:
         print(f"No data found in the table for station {station_name} at {tabelle_link}.")
         return None
 
-    df = pd.DataFrame(data, columns=['Station', 'DateTime', 'Type', 'WaterLevel', 'Forecast_Lower', 'Forecast_Upper'])
+    df = pd.DataFrame(data, columns=['Station', 'DateTime', 'Type', 'WaterLevel', 'Forecast_Lower', 'Forecast_Upper', 'Meldestufe'])
     return df
 
 def crawl_station_master_data(station_main_page_url, station_name):
@@ -178,7 +203,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
     CRAWL_MODE = args.mode
 
-    stations = get_station_data()
+    stations, meldestufen_data = get_station_data()
     print(f"Found {len(stations)} stations.")
     if stations:
         all_data = []
@@ -188,7 +213,7 @@ if __name__ == '__main__':
             print(f"Attempting to crawl data for station: {station['name']} from main page {station['link']}")
             
             if CRAWL_MODE == "measurements":
-                station_df = crawl_station_data(station['link'], station['name'])
+                station_df = crawl_station_data(station['link'], station['name'], meldestufen_data)
             elif CRAWL_MODE == "master_data":
                 station_df = crawl_station_master_data(station['link'], station['name'])
             else:
