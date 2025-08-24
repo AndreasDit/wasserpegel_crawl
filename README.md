@@ -73,6 +73,7 @@ The crawler outputs pandas DataFrames saved as CSV files in the `data/` director
 | `WaterLevel`     | The measured water level in cm. Empty for forecasts.|
 | `Forecast_Lower` | The lower bound of the forecast range. Empty for measured values. |
 | `Forecast_Upper` | The upper bound of the forecast range. Empty for measured values. |
+| `Meldestufe`     | The current flood warning level for the station.    |
 
 ### Station Master Data (`data/station_master_data.csv`)
 
