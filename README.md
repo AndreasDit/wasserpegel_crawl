@@ -6,7 +6,7 @@ This project contains a Python web crawler to extract water level data from the 
 
 The crawler fetches data from the website of the Hochwassernachrichtendienst Bayern (https://www.hnd.bayern.de). It is designed to be adaptable for different measurement stations.
 
-The current implementation crawls the data for the station "Schweinfurt Neuer Hafen" and extracts both measured water levels and forecast data.
+The current implementation successfully crawls the data for the station "Schweinfurt Neuer Hafen" and extracts both measured water levels and forecast data. The crawler is currently functional and retrieves the correct data.
 
 ## Technologies
 
