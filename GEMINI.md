@@ -56,6 +56,22 @@ The primary objective of this project is to develop a Python web crawler that ex
 *   The `crawler.py` script was modified to write all output CSVs into this `data/` directory.
 *   The `data/` directory was added to the `.gitignore` file to prevent generated data from being committed to the repository.
 
+### 6. Meldestufe Extraction
+
+**Feature:** Integrated the extraction of the "Meldestufe" (flood warning level) for each station directly from the initial station list page.
+**Implementation Details:**
+*   The `get_station_data()` function was modified to parse the "Meldestufe" column from the table at `https://www.hnd.bayern.de/pegel/meldestufen//tabellen`.
+*   This "Meldestufe" information is now passed to the `crawl_station_data()` function.
+*   A new column, `Meldestufe`, has been added to the `data/water_levels.csv` output, containing the relevant flood warning level for each measurement and forecast entry.
+*   The parsing of the table headers in `get_station_data()` was made more robust to handle variations in HTML structure (e.g., soft hyphens in header names).
+
+### 7. URL Construction Fix and Data Type Refinement
+
+**Improvement:** Addressed issues with URL construction for individual station pages and refined data types for better analysis.
+**Implementation Details:**
+*   The `get_station_data` function was corrected to properly construct station URLs by correctly handling relative paths.
+*   The `DateTime`, `WaterLevel`, `Forecast_Lower`, and `Forecast_Upper` columns are now converted to their proper data types (datetime and numeric) to facilitate easier data analysis.
+
 ## Current Status
 
 The project now has enhanced capabilities for both water level and master data extraction, improved code structure, and a robust test suite to ensure future development is stable.
